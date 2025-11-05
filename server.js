@@ -1,71 +1,66 @@
-// server.js - Starter Express server for Week 2 assignment
+// server.js
 
-// Import required modules
+// Core Modules
 const express = require('express');
-const bodyParser = require('body-parser');
-const { v4: uuidv4 } = require('uuid');
+const dotenv = require('dotenv');
 
-// Initialize Express app
+// Load environment variables from .env file immediately
+dotenv.config();
+
+// Middleware and Route Imports
+const loggerMiddleware = require('./middleware/logger');
+const productRoutes = require('./routes/productRoutes');
+const { NotFoundError } = require('./utils/errorClasses'); // Custom error for 404
+
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3000; // Use port from .env or default to 3000
 
-// Middleware setup
-app.use(bodyParser.json());
+// --- GLOBAL MIDDLEWARE (Task 3) ---
 
-// Sample in-memory products database
-let products = [
-  {
-    id: '1',
-    name: 'Laptop',
-    description: 'High-performance laptop with 16GB RAM',
-    price: 1200,
-    category: 'electronics',
-    inStock: true
-  },
-  {
-    id: '2',
-    name: 'Smartphone',
-    description: 'Latest model with 128GB storage',
-    price: 800,
-    category: 'electronics',
-    inStock: true
-  },
-  {
-    id: '3',
-    name: 'Coffee Maker',
-    description: 'Programmable coffee maker with timer',
-    price: 50,
-    category: 'kitchen',
-    inStock: false
-  }
-];
+// 1. Custom Logger Middleware
+app.use(loggerMiddleware);
 
-// Root route
+// 2. JSON Body Parser Middleware (Required for POST and PUT requests)
+app.use(express.json());
+
+// --- CORE ROUTES (Task 1 & 2) ---
+
+// "Hello World" root route (Task 1)
 app.get('/', (req, res) => {
-  res.send('Welcome to the Product API! Go to /api/products to see all products.');
+    res.send('Hello World! Product Management API is operational.');
 });
 
-// TODO: Implement the following routes:
-// GET /api/products - Get all products
-// GET /api/products/:id - Get a specific product
-// POST /api/products - Create a new product
-// PUT /api/products/:id - Update a product
-// DELETE /api/products/:id - Delete a product
+// Mount the Product API Routes (Task 2)
+app.use('/api/products', productRoutes);
 
-// Example route implementation for GET /api/products
-app.get('/api/products', (req, res) => {
-  res.json(products);
+// --- ERROR HANDLING (Task 4) ---
+
+// 1. 404 Not Found Handler (Must be placed after all valid routes)
+app.use((req, res, next) => {
+    // If we reach here, no route matched, so we throw a 404
+    next(new NotFoundError(`The resource ${req.originalUrl} was not found.`));
 });
 
-// TODO: Implement custom middleware for:
-// - Request logging
-// - Authentication
-// - Error handling
+// 2. Global Error Handling Middleware (The four-argument handler: err, req, res, next)
+app.use((err, req, res, next) => {
+    // Determine the status code: use the status property from custom errors, or default to 500
+    const statusCode = err.status || 500;
+    
+    // Log the error details for server-side debugging
+    console.error(`[${new Date().toISOString()}] ${statusCode} ERROR: ${err.message}`);
 
-// Start the server
+    // Send the structured error response back to the client
+    res.status(statusCode).json({
+        status: 'error',
+        message: err.message,
+        type: err.name, // e.g., NotFoundError, ValidationError
+        // Optionally include specific validation errors if available
+        errors: err.errors || undefined
+    });
+});
+
+// --- START SERVER (Task 1) ---
+
 app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+    console.log(`Server is running on port ${PORT} 🚀`);
 });
-
-// Export the app for testing purposes
-module.exports = app; 
